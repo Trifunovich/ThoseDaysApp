@@ -26,14 +26,13 @@ public class PredictionsController(ICycleService cycleService) : ControllerBase
     [HttpGet("stats")]
     public async Task<ActionResult<StatsResponse>> GetStats(Guid userId)
     {
-        var (avgLength, avgInterval) = await cycleService.GetStatsAsync(userId);
-        var cycles = await cycleService.GetUserCyclesAsync(userId);
+        var (avgLength, avgInterval, totalPeriods) = await cycleService.GetStatsAsync(userId);
 
         var response = new StatsResponse
         {
             AverageCycleLength = avgLength,
             AverageInterval = avgInterval,
-            TotalCycles = cycles.Count
+            TotalCycles = totalPeriods
         };
 
         return Ok(response);

@@ -43,15 +43,32 @@ function Calendar({ cycles, onCycleAdded, userId }: CalendarProps) {
     }
   };
 
-  const handleAddCycle = async (date: Date) => {
-    const startDate = date.toISOString().split('T')[0];
-    const durationDays = 5;
+  const toLocalDateString = (date: Date) => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const handleDayClick = async (date: Date) => {
+    const existing = getCycleForDate(date);
 
     try {
+      if (existing) {
+        const res = await fetch(`/api/user/${userId}/cycles/${existing.id}`, {
+          method: 'DELETE'
+        });
+        if (res.ok) {
+          onCycleAdded();
+          fetchPredictions();
+        }
+        return;
+      }
+
       const res = await fetch(`/api/user/${userId}/cycles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDate, durationDays })
+        body: JSON.stringify({ startDate: toLocalDateString(date), durationDays: 1 })
       });
 
       if (res.ok) {
@@ -59,7 +76,7 @@ function Calendar({ cycles, onCycleAdded, userId }: CalendarProps) {
         fetchPredictions();
       }
     } catch (error) {
-      console.error('Error adding cycle:', error);
+      console.error('Error toggling cycle day:', error);
     }
   };
 
@@ -118,7 +135,7 @@ function Calendar({ cycles, onCycleAdded, userId }: CalendarProps) {
       const prediction = getPredictionForDate(date);
 
       days.push(
-        <div key={day} className="calendar-day" onClick={() => handleAddCycle(date)}>
+        <div key={day} className="calendar-day" onClick={() => handleDayClick(date)}>
           <span className="day-number">{day}</span>
           {cycle && (
             <div className="period-mark actual">

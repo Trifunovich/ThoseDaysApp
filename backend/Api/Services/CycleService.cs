@@ -10,12 +10,19 @@ public interface ICycleService
     Task<Cycle> AddCycleAsync(Guid userId, DateTime startDate, int durationDays);
     Task<Cycle?> UpdateCycleAsync(Guid userId, Guid cycleId, DateTime startDate, int durationDays);
     Task<bool> DeleteCycleAsync(Guid userId, Guid cycleId);
-    Task<(double averageCycleLength, double averageInterval)> GetStatsAsync(Guid userId);
+    Task<(double averageCycleLength, double averageInterval, int totalPeriods)> GetStatsAsync(Guid userId);
     Task<List<Prediction>> GeneratePredictionsAsync(Guid userId, int numCycles);
 }
 
 public class CycleService(AppDbContext context) : ICycleService
 {
+    private static DateTime ToUtc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+    };
+
     public async Task<List<Cycle>> GetUserCyclesAsync(Guid userId)
     {
         return await context.Cycles
@@ -29,7 +36,7 @@ public class CycleService(AppDbContext context) : ICycleService
         var cycle = new Cycle
         {
             UserId = userId,
-            StartDate = startDate,
+            StartDate = ToUtc(startDate),
             DurationDays = durationDays
         };
 
@@ -47,7 +54,7 @@ public class CycleService(AppDbContext context) : ICycleService
         if (cycle == null)
             return null;
 
-        cycle.StartDate = startDate;
+        cycle.StartDate = ToUtc(startDate);
         cycle.DurationDays = durationDays;
         cycle.Corrected = true;
 
@@ -86,69 +93,109 @@ public class CycleService(AppDbContext context) : ICycleService
         return true;
     }
 
-    public async Task<(double averageCycleLength, double averageInterval)> GetStatsAsync(Guid userId)
+    public async Task<(double averageCycleLength, double averageInterval, int totalPeriods)> GetStatsAsync(Guid userId)
     {
-        var cycles = await GetUserCyclesAsync(userId);
+        var periods = await GetPeriodsAsync(userId);
 
-        if (cycles.Count == 0)
-            return (0, 0);
+        if (periods.Count == 0)
+            return (0, 0, 0);
 
-        var cycleLengths = cycles.Select(c => c.DurationDays).ToList();
-        var averageCycleLength = cycleLengths.Average();
+        var averageCycleLength = periods.Average(p => p.Length);
 
-        if (cycles.Count < 2)
-            return (averageCycleLength, 28);
+        if (periods.Count < 2)
+            return (averageCycleLength, 28, periods.Count);
 
         var intervals = new List<int>();
-        for (int i = 1; i < cycles.Count; i++)
+        for (int i = 1; i < periods.Count; i++)
         {
-            var interval = (cycles[i].StartDate.Date - cycles[i - 1].StartDate.Date).Days;
-            intervals.Add(interval);
+            intervals.Add((periods[i].Start - periods[i - 1].Start).Days);
         }
 
-        var averageInterval = intervals.Count > 0 ? intervals.Average() : 28;
-
-        return (averageCycleLength, averageInterval);
+        return (averageCycleLength, intervals.Average(), periods.Count);
     }
 
     public async Task<List<Prediction>> GeneratePredictionsAsync(Guid userId, int numCycles)
     {
-        var cycles = await GetUserCyclesAsync(userId);
+        var periods = await GetPeriodsAsync(userId);
         var predictions = new List<Prediction>();
-
-        if (cycles.Count == 0)
-            return predictions;
-
-        var (_, averageInterval) = await GetStatsAsync(userId);
-        if (averageInterval == 0)
-            averageInterval = 28;
-
-        var lastCycle = cycles.Last();
-        var nextStartDate = lastCycle.StartDate.AddDays((int)Math.Round(averageInterval));
-
-        for (int i = 0; i < numCycles; i++)
-        {
-            var prediction = new Prediction
-            {
-                UserId = userId,
-                PredictedStart = nextStartDate,
-                PredictedDuration = (int)Math.Round((double)lastCycle.DurationDays),
-                Confidence = 0.85f
-            };
-
-            predictions.Add(prediction);
-            nextStartDate = nextStartDate.AddDays((int)Math.Round((double)averageInterval));
-        }
 
         var existingPredictions = await context.Predictions
             .Where(p => p.UserId == userId)
             .ToListAsync();
-
         context.Predictions.RemoveRange(existingPredictions);
+
+        if (periods.Count == 0)
+        {
+            await context.SaveChangesAsync();
+            return predictions;
+        }
+
+        var (avgLength, avgInterval, _) = await GetStatsAsync(userId);
+        if (avgInterval <= 0) avgInterval = 28;
+
+        var predictedDuration = avgLength > 0 ? (int)Math.Round(avgLength) : 5;
+        if (predictedDuration < 1) predictedDuration = 1;
+
+        var lastPeriod = periods.Last();
+        var nextStartDate = lastPeriod.Start.AddDays((int)Math.Round(avgInterval));
+
+        for (int i = 0; i < numCycles; i++)
+        {
+            predictions.Add(new Prediction
+            {
+                UserId = userId,
+                PredictedStart = nextStartDate,
+                PredictedDuration = predictedDuration,
+                Confidence = 0.85f
+            });
+            nextStartDate = nextStartDate.AddDays((int)Math.Round(avgInterval));
+        }
 
         context.Predictions.AddRange(predictions);
         await context.SaveChangesAsync();
 
         return predictions;
+    }
+
+    private async Task<List<(DateTime Start, int Length)>> GetPeriodsAsync(Guid userId)
+    {
+        var cycles = await GetUserCyclesAsync(userId);
+
+        var days = new SortedSet<DateTime>();
+        foreach (var c in cycles)
+        {
+            for (int i = 0; i < c.DurationDays; i++)
+                days.Add(c.StartDate.Date.AddDays(i));
+        }
+
+        var periods = new List<(DateTime Start, int Length)>();
+        DateTime? runStart = null;
+        DateTime? prev = null;
+        int length = 0;
+
+        foreach (var day in days)
+        {
+            if (runStart is null)
+            {
+                runStart = day;
+                length = 1;
+            }
+            else if (day == prev!.Value.AddDays(1))
+            {
+                length++;
+            }
+            else
+            {
+                periods.Add((runStart.Value, length));
+                runStart = day;
+                length = 1;
+            }
+            prev = day;
+        }
+
+        if (runStart is not null)
+            periods.Add((runStart.Value, length));
+
+        return periods;
     }
 }
