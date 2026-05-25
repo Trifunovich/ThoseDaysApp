@@ -1,0 +1,49 @@
+using Api.DTOs;
+using Api.Services;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Api.Controllers;
+
+[ApiController]
+[Route("api/auth")]
+public class AuthController(IAuthService authService) : ControllerBase
+{
+    [HttpPost("register")]
+    public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request)
+    {
+        var user = await authService.RegisterAsync(request.Email, request.Password);
+        if (user == null)
+            return BadRequest(new { error = "Registration failed" });
+
+        var token = GenerateSimpleToken(user.Id);
+        return Ok(new AuthResponse
+        {
+            UserId = user.Id,
+            Email = user.Email,
+            Token = token
+        });
+    }
+
+    [HttpPost("login")]
+    public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest request)
+    {
+        var user = await authService.LoginAsync(request.Email, request.Password);
+        if (user == null)
+            return Unauthorized(new { error = "Invalid email or password" });
+
+        var token = GenerateSimpleToken(user.Id);
+        return Ok(new AuthResponse
+        {
+            UserId = user.Id,
+            Email = user.Email,
+            Token = token
+        });
+    }
+
+    private static string GenerateSimpleToken(Guid userId)
+    {
+        var tokenData = $"{userId}:{DateTime.UtcNow.Ticks}";
+        var tokenBytes = System.Text.Encoding.UTF8.GetBytes(tokenData);
+        return Convert.ToBase64String(tokenBytes);
+    }
+}
