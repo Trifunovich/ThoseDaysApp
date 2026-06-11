@@ -55,6 +55,27 @@ React inputs are controlled — `preview_fill` sets the DOM value but doesn't fi
 React's onChange. To log in via the preview, set values with a native-setter +
 `input` event, or just `preview_click` real elements (clicks do dispatch).
 
+Copy-paste login via `preview_eval` (reset a user's password first with the
+dev `POST /api/auth/reset-password`, then):
+
+```js
+(() => {
+  const set = (el, val) => {
+    const d = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value');
+    d.set.call(el, val);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  set(document.querySelector('input[type="email"]'), 'a.trifunovic.sf@Gmail.com');
+  set(document.querySelector('input[type="password"]'), 'password123');
+  [...document.querySelectorAll('button')].find(b => /sign in/i.test(b.textContent))?.click();
+})()
+```
+
+Note: React state updates after the eval returns, so don't read the resulting
+DOM in the same `preview_eval` — wait a tick (e.g. `setTimeout`/poll) or use a
+follow-up call. A user with several cycles (e.g. `a.trifunovic.sf@Gmail.com`)
+gives non-empty predictions to verify against.
+
 ## Smoke checks
 
 ```powershell
