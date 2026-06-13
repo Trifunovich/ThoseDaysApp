@@ -1,6 +1,8 @@
 # ThoseDaysApp - Menstrual Cycle Tracker
 
-A progressive web app for tracking and predicting menstrual cycles using statistical averaging. Built with .NET 10, React 18, TypeScript, and PostgreSQL.
+A progressive web app for tracking and predicting menstrual cycles using statistical averaging. Built with .NET, React, TypeScript, and PostgreSQL.
+
+ThoseDaysApp is made primarily to be **self-hosted**: cycle data is about as personal as data gets, and it should live on infrastructure you control — not on someone else's cloud.
 
 ## Features
 
@@ -25,19 +27,19 @@ A progressive web app for tracking and predicting menstrual cycles using statist
 
 ## Tech Stack
 
-- **Backend**: .NET 10 with ASP.NET Core, Entity Framework Core, PostgreSQL
-- **Frontend**: React 18, Vite 5, TypeScript 5, CSS3
-- **Database**: PostgreSQL 15
+- **Backend**: ASP.NET Core, Entity Framework Core
+- **Frontend**: React, Vite, TypeScript, CSS
+- **Database**: PostgreSQL
 - **Containerization**: Docker & Docker Compose
+- **Observability**: Serilog + OpenTelemetry traces, collected in Seq
 
 ## Getting Started
 
 ### Prerequisites
 
 - Docker & Docker Compose
-- .NET 10 SDK
-- Node.js 18+
-- npm or yarn
+- .NET SDK (matching the target framework in `backend/Api/Api.csproj`)
+- Node.js (current LTS) and npm
 
 ### Installation
 
@@ -93,6 +95,24 @@ dotnet publish backend/Api -c Release
 npm run build --prefix frontend
 ```
 
+### Self-hosting
+
+The app ships as a single Docker image (the built frontend is bundled into the
+backend) plus a PostgreSQL container, orchestrated with Docker Compose. See
+[docs/infrastructure.md](docs/infrastructure.md) and
+[docs/deploy-runbook.md](docs/deploy-runbook.md) for the full picture, including
+running separate staging/production stacks and collecting logs and traces in Seq.
+
+**A note on Seq**: using [Seq](https://datalust.co/seq) for logs and traces is a
+personal preference of the maintainer — as a single developer running tools
+locally, its free Individual license (1 user) is a great fit. Seq itself is
+proprietary software, and the compose file accepts its EULA on your behalf
+(`ACCEPT_EULA: "Y"`), so make sure that license works for you too. It's entirely
+optional: the app starts fine without it, and since traces are exported over
+standard OpenTelemetry (OTLP), you can swap in any other backend — Jaeger,
+SigNoz, Grafana — by setting `OTEL_EXPORTER_OTLP_ENDPOINT` (full path including
+`/v1/traces`).
+
 ## Testing
 
 ```bash
@@ -105,6 +125,25 @@ npm test --prefix frontend -- --run
 ```
 
 See [docs/testing.md](docs/testing.md) for what each suite covers and the CI gate.
+
+## Documentation
+
+Deeper docs live in [`docs/`](docs/):
+
+**Operations**
+
+- [infrastructure.md](docs/infrastructure.md) — CI/CD and self-hosted staging/prod setup
+- [deploy-runbook.md](docs/deploy-runbook.md) — one-time homelab VM setup for auto-deploy
+- [testing.md](docs/testing.md) — what each test suite covers and the CI gate
+
+**Feature design**
+
+- [recalc-spec.md](docs/recalc-spec.md) — the recalculation / draft-vs-committed model
+- [notifications.md](docs/notifications.md) — release-notification emails (versioning + delivery)
+- [ui-updates.md](docs/ui-updates.md) — calendar today marker, countdown, return-to-month
+- [period-reminders.md](docs/period-reminders.md) — opt-in emails before a predicted period
+- [data-export-import.md](docs/data-export-import.md) — export, reviewed-patch import, and server backups
+- [prediction-confidence.md](docs/prediction-confidence.md) — variability-based confidence and a predicted-date range
 
 ## API Endpoints
 
@@ -198,10 +237,31 @@ Brand/surface colors are CSS variables in `frontend/src/styles/index.css` with a
 - TypeScript strict mode enabled
 - No external state management library (uses React Context)
 
-## License
+## AI-assisted development
 
-MIT
+This project is built with the help of AI coding assistants — primarily Claude
+and DeepSeek. They write a good share of the code; a human maintainer directs
+the work, reviews every change, and nothing ships without passing the test
+suites and CI. We'd rather be upfront about this than have you wonder — and
+it's a big part of how a small self-hosted project like this can keep moving.
 
-## Support
+## Support the project
+
+If ThoseDaysApp is useful to you, you can support its development:
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy_me_a_coffee-☕-FFDD00?style=for-the-badge&logoColor=black)](https://buymeacoffee.com/YOUR_USERNAME)
 
 For issues or questions, please open an issue on the GitHub repository.
+
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the
+ground rules (human review, tests, green pipeline) and
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community standards.
+
+## License
+
+[AGPL-3.0](LICENSE). In short: use it, self-host it, modify it freely — but if
+you offer a modified version to others over a network, you must make your
+source available under the same license. Chosen deliberately to keep this
+project and its forks open.

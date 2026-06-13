@@ -90,6 +90,8 @@ builder.Services.Configure<Api.Config.SmtpOptions>(o =>
 });
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddHostedService<ReleaseNotifier>();
+builder.Services.AddHostedService<ReminderNotifier>();
+builder.Services.AddHostedService<BackupService>();
 
 var app = builder.Build();
 

@@ -8,6 +8,7 @@ import StatusBar from './components/StatusBar';
 import BloodDropIcon from './components/BloodDropIcon';
 import LoginPage from './pages/LoginPage';
 import StatsPage from './pages/StatsPage';
+import SettingsPage from './pages/SettingsPage';
 import './styles/app.css';
 
 const FONT_MIN = 40;
@@ -78,7 +79,7 @@ function AppContent() {
   const { user, logout } = useAuth();
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [nextPeriod, setNextPeriod] = useState<{ startIso: string; daysUntil: number } | null>(null);
+  const [nextPeriod, setNextPeriod] = useState<{ startIso: string; daysUntil: number; rangeLabel: string | null } | null>(null);
   const [, setLoading] = useState(true);
 
   useEffect(() => {
@@ -127,6 +128,7 @@ function AppContent() {
         <nav className="app-nav">
           <NavLink to="/" end className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Calendar</NavLink>
           <NavLink to="/stats" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Statistics</NavLink>
+          <NavLink to="/settings" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>Settings</NavLink>
         </nav>
         <div className="app-header-right">
           <span className="app-header-email">{user.email}</span>
@@ -152,12 +154,14 @@ function AppContent() {
                     averageInterval={stats.averageInterval}
                     totalCycles={stats.totalCycles}
                     nextPeriodDays={nextPeriod?.daysUntil ?? null}
+                    nextPeriodRange={nextPeriod?.rangeLabel ?? null}
                   />
                 )}
               </>
             }
           />
           <Route path="/stats" element={<StatsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </main>
       <footer className="app-footer">
