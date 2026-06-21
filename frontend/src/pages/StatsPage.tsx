@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { apiFetch } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { findNextPrediction, predictionConfidence, type RecalcConfig } from '../lib/predictions';
 import {
@@ -47,8 +48,8 @@ function StatsPage() {
     (async () => {
       try {
         const [c, p, cfg] = await Promise.all([
-          fetch(`/api/user/${user.id}/cycles`).then((r) => (r.ok ? r.json() : [])),
-          fetch(`/api/user/${user.id}/predictions`).then((r) => (r.ok ? r.json() : [])),
+          apiFetch(`/api/user/${user.id}/cycles`).then((r) => (r.ok ? r.json() : [])),
+          apiFetch(`/api/user/${user.id}/predictions`).then((r) => (r.ok ? r.json() : [])),
           fetch('/api/config').then((r) => (r.ok ? r.json() : DEFAULT_CONFIG)),
         ]);
         if (!alive) return;
@@ -88,7 +89,7 @@ function StatsPage() {
   if (periods.length === 0) {
     return (
       <div className="stats-page">
-        <h1>Statistics</h1>
+        <h1 className="page-title">Statistics</h1>
         <p className="chart-empty">No cycles logged yet. Add a few on the calendar and your stats will appear here.</p>
       </div>
     );
@@ -103,7 +104,7 @@ function StatsPage() {
 
   return (
     <div className="stats-page">
-      <h1>Statistics</h1>
+      <h1 className="page-title">Statistics</h1>
 
       {/* KPI cards */}
       <section className="kpi-grid">
